@@ -1,87 +1,120 @@
-require("./keep_alive");
-const { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes } = require('discord.js');
-const fs = require('fs');
+require("dotenv").config();
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require("discord.js");
+const fs = require("fs");
 
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ]
+  intents: [GatewayIntentBits.Guilds]
 });
 
-let data = require('./data.json');
-let cooldown = {};
+const DATA_FILE = "./data.json";
 
+// Load data
+function loadData() {
+  if (!fs.existsSync(DATA_FILE)) return {};
+  return JSON.parse(fs.readFileSync(DATA_FILE));
+}
+
+// Save data
+function saveData(data) {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+}
+
+client.once("ready", () => {
+  console.log(`Bot đã online: ${client.user.tag}`);
+});
+
+// Slash Commands
 const commands = [
-    new SlashCommandBuilder()
-        .setName('thêm')
-        .setDescription('Thêm lệnh')
-        .addStringOption(option =>
-            option.setName('noidung')
-                .setDescription('từ | nội dung')
-                .setRequired(true)
-        ),
-    new SlashCommandBuilder()
-        .setName('sửa')
-        .setDescription('Sửa lệnh')
-        .addStringOption(option =>
-            option.setName('noidung')
-                .setDescription('từ | nội dung')
-                .setRequired(true)
-        )
-].map(command => command.toJSON());
+  new SlashCommandBuilder()
+    .setName("them")
+    .setDescription("Thêm dữ liệu")
+    .addStringOption(option =>
+      option.setName("key").setDescription("Tên").setRequired(true))
+    .addStringOption(option =>
+      option.setName("value").setDescription("Giá trị").setRequired(true)),
 
-const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+  new SlashCommandBuilder()
+    .setName("sua")
+    .setDescription("Sửa dữ liệu")
+    .addStringOption(option =>
+      option.setName("key").setDescription("Tên").setRequired(true))
+    .addStringOption(option =>
+      option.setName("value").setDescription("Giá trị mới").setRequired(true)),
 
-client.once('ready', async () => {
-    console.log('Bot đã online');
+  new SlashCommandBuilder()
+    .setName("xoa")
+    .setDescription("Xóa dữ liệu")
+    .addStringOption(option =>
+      option.setName("key").setDescription("Tên").setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName("xem")
+    .setDescription("Xem dữ liệu")
+];
+
+const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
+
+(async () => {
+  try {
     await rest.put(
-        Routes.applicationCommands(client.user.id),
-        { body: commands },
+      Routes.applicationCommands(process.env.CLIENT_ID),
+      { body: commands }
     );
-});
+    console.log("Đã đăng ký slash commands");
+  } catch (err) {
+    console.error(err);
+  }
+})();
 
-client.on('interactionCreate', async interaction => {
-    if (!interaction.isChatInputCommand()) return;
+client.on("interactionCreate", async interaction => {
+  if (!interaction.isChatInputCommand()) return;
 
-    const input = interaction.options.getString('noidung');
-    const splitIndex = input.indexOf('|');
-    if (splitIndex === -1) return interaction.reply("Sai cú pháp");
+  const data = loadData();
 
-    const trigger = input.slice(0, splitIndex).trim();
-    const reply = input.slice(splitIndex + 1).trim();
+  if (interaction.commandName === "them") {
+    const key = interaction.options.getString("key");
+    const value = interaction.options.getString("value");
 
-    if (interaction.commandName === 'thêm') {
-        data[trigger] = reply;
-        fs.writeFileSync('./data.json', JSON.stringify(data));
-        interaction.reply(`Đã thêm lệnh: ${trigger}`);
+    data[key] = value;
+    saveData(data);
+
+    await interaction.reply(`Đã thêm: ${key} = ${value}`);
+  }
+
+  if (interaction.commandName === "sua") {
+    const key = interaction.options.getString("key");
+    const value = interaction.options.getString("value");
+
+    if (!data[key]) return interaction.reply("Không tồn tại!");
+
+    data[key] = value;
+    saveData(data);
+
+    await interaction.reply(`Đã sửa: ${key} = ${value}`);
+  }
+
+  if (interaction.commandName === "xoa") {
+    const key = interaction.options.getString("key");
+
+    if (!data[key]) return interaction.reply("Không tồn tại!");
+
+    delete data[key];
+    saveData(data);
+
+    await interaction.reply(`Đã xóa: ${key}`);
+  }
+
+  if (interaction.commandName === "xem") {
+    if (Object.keys(data).length === 0)
+      return interaction.reply("Chưa có dữ liệu");
+
+    let msg = "";
+    for (let key in data) {
+      msg += `${key}: ${data[key]}\n`;
     }
 
-    if (interaction.commandName === 'sửa') {
-        if (!data[trigger]) return interaction.reply("Lệnh chưa tồn tại");
-        data[trigger] = reply;
-        fs.writeFileSync('./data.json', JSON.stringify(data));
-        interaction.reply(`Đã sửa lệnh: ${trigger}`);
-    }
-});
-
-client.on('messageCreate', message => {
-    if (message.author.bot) return;
-    if (message.interaction) return;
-
-    const content = message.content.trim();
-
-    if (data[content]) {
-        if (cooldown[message.author.id]) return;
-        cooldown[message.author.id] = true;
-
-        message.reply(data[content]);
-
-        setTimeout(() => {
-            delete cooldown[message.author.id];
-        }, 2000);
-    }
+    await interaction.reply(msg);
+  }
 });
 
 client.login(process.env.TOKEN);
