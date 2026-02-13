@@ -1,3 +1,4 @@
+require("./keep_alive");
 const { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes } = require('discord.js');
 const fs = require('fs');
 
