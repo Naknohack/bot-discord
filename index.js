@@ -10,10 +10,8 @@ const client = new Client({
     ]
 });
 
-let data = {};
-if (fs.existsSync('./data.json')) {
-    data = JSON.parse(fs.readFileSync('./data.json'));
-}
+let data = require('./data.json');
+let cooldown = {};
 
 const commands = [
     new SlashCommandBuilder()
@@ -56,14 +54,14 @@ client.on('interactionCreate', async interaction => {
 
     if (interaction.commandName === 'thêm') {
         data[trigger] = reply;
-        fs.writeFileSync('./data.json', JSON.stringify(data, null, 2));
+        fs.writeFileSync('./data.json', JSON.stringify(data));
         interaction.reply(`Đã thêm lệnh: ${trigger}`);
     }
 
     if (interaction.commandName === 'sửa') {
         if (!data[trigger]) return interaction.reply("Lệnh chưa tồn tại");
         data[trigger] = reply;
-        fs.writeFileSync('./data.json', JSON.stringify(data, null, 2));
+        fs.writeFileSync('./data.json', JSON.stringify(data));
         interaction.reply(`Đã sửa lệnh: ${trigger}`);
     }
 });
@@ -75,7 +73,14 @@ client.on('messageCreate', message => {
     const content = message.content.trim();
 
     if (data[content]) {
+        if (cooldown[message.author.id]) return;
+        cooldown[message.author.id] = true;
+
         message.reply(data[content]);
+
+        setTimeout(() => {
+            delete cooldown[message.author.id];
+        }, 2000);
     }
 });
 
