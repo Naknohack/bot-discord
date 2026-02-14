@@ -1,7 +1,5 @@
-require("dotenv").config();
 require("./keep_alive");
-
-const { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
 const fs = require('fs');
 
 const client = new Client({
@@ -17,80 +15,74 @@ if (fs.existsSync('./data.json')) {
     data = JSON.parse(fs.readFileSync('./data.json'));
 }
 
-const commands = [
-    new SlashCommandBuilder()
-        .setName('thêm')
-        .setDescription('Thêm lệnh')
-        .addStringOption(option =>
-            option.setName('noidung')
-                .setDescription('từ | nội dung')
-                .setRequired(true)
-        ),
-    new SlashCommandBuilder()
-        .setName('sửa')
-        .setDescription('Sửa lệnh')
-        .addStringOption(option =>
-            option.setName('noidung')
-                .setDescription('từ | nội dung')
-                .setRequired(true)
-        ),
-    new SlashCommandBuilder()
-        .setName('xóa')
-        .setDescription('Xóa lệnh')
-        .addStringOption(option =>
-            option.setName('tu')
-                .setDescription('từ cần xóa')
-                .setRequired(true)
-        )
-].map(command => command.toJSON());
-
-const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
-
 client.once('ready', async () => {
-    console.log('Bot đã online');
+    console.log(`Bot đã online: ${client.user.tag}`);
+
+    const commands = [
+        {
+            name: 'thêm',
+            description: 'Thêm lệnh',
+            options: [
+                { name: 'key', description: 'Tên lệnh', type: 3, required: true },
+                { name: 'value', description: 'Nội dung trả lời', type: 3, required: true }
+            ]
+        },
+        {
+            name: 'sửa',
+            description: 'Sửa lệnh',
+            options: [
+                { name: 'key', description: 'Tên lệnh', type: 3, required: true },
+                { name: 'value', description: 'Nội dung mới', type: 3, required: true }
+            ]
+        },
+        {
+            name: 'xóa',
+            description: 'Xóa lệnh',
+            options: [
+                { name: 'key', description: 'Tên lệnh', type: 3, required: true }
+            ]
+        }
+    ];
+
+    const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+
     await rest.put(
         Routes.applicationCommands(client.user.id),
-        { body: commands },
+        { body: commands }
     );
 });
 
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    if (interaction.commandName === 'xóa') {
-        const tu = interaction.options.getString('tu');
-        if (!data[tu]) return interaction.reply("Lệnh không tồn tại");
-        delete data[tu];
-        fs.writeFileSync('./data.json', JSON.stringify(data, null, 2));
-        return interaction.reply(`Đã xóa lệnh: ${tu}`);
-    }
-
-    const input = interaction.options.getString('noidung');
-    const splitIndex = input.indexOf('|');
-    if (splitIndex === -1) return interaction.reply("Sai cú pháp");
-
-    const trigger = input.slice(0, splitIndex).trim();
-    const reply = input.slice(splitIndex + 1).trim();
+    const key = interaction.options.getString('key');
+    const value = interaction.options.getString('value');
 
     if (interaction.commandName === 'thêm') {
-        data[trigger] = reply;
+        data[key] = value;
         fs.writeFileSync('./data.json', JSON.stringify(data, null, 2));
-        return interaction.reply(`Đã thêm lệnh: ${trigger}`);
+        return interaction.reply(`Đã thêm: ${key}`);
     }
 
     if (interaction.commandName === 'sửa') {
-        if (!data[trigger]) return interaction.reply("Lệnh chưa tồn tại");
-        data[trigger] = reply;
+        if (!data[key]) return interaction.reply("Lệnh chưa tồn tại");
+        data[key] = value;
         fs.writeFileSync('./data.json', JSON.stringify(data, null, 2));
-        return interaction.reply(`Đã sửa lệnh: ${trigger}`);
+        return interaction.reply(`Đã sửa: ${key}`);
+    }
+
+    if (interaction.commandName === 'xóa') {
+        if (!data[key]) return interaction.reply("Lệnh không tồn tại");
+        delete data[key];
+        fs.writeFileSync('./data.json', JSON.stringify(data, null, 2));
+        return interaction.reply(`Đã xóa: ${key}`);
     }
 });
 
 client.on('messageCreate', message => {
     if (message.author.bot) return;
-    const content = message.content.trim();
-    if (data[content]) {
-        message.reply(data[content]);
+    if (data[message.content]) {
+        message.reply(data[message.content]);
     }
 });
 
