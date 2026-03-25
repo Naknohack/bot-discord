@@ -923,6 +923,20 @@ WeaponsGroup:AddButton({
         })
     end
 })
+WeaponsGroup:AddButton({
+    Title = "Run NakHub V3",
+    Callback = function()
+        getgenv().Team = "Marines"
+        
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Naknohack/NakHubBF/refs/heads/main/NakHubV3.lua"))()
+        
+        Library:Notify({
+            Title = "NakHub",
+            Description = "Script NakHub V3 đã chạy!",
+            Duration = 3
+        })
+    end
+})
 
 -- ===== Misc Tab (Discord) =====
 local MiscGroup = TabMisc:AddLeftGroupbox("Information")
